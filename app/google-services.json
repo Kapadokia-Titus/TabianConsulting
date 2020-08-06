@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "325029015186",
+    "firebase_url": "https://tubonge-4316a.firebaseio.com",
+    "project_id": "tubonge-4316a",
+    "storage_bucket": "tubonge-4316a.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:325029015186:android:15856eab34e41728f0804b",
+        "android_client_info": {
+          "package_name": "kapadokia.nyandoro.tubonge"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "325029015186-5m3m62lh94tbi8rnf0pm8kp0313dakt1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "kapadokia.nyandoro.tubonge",
+            "certificate_hash": "fd5a5a1258ce0af7bc26f9c7db258d33174663de"
+          }
+        },
+        {
+          "client_id": "325029015186-4b6e173bltricgrah1bca19s993594lu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOd7yFyRmwD-foVj3OKEGT9xxafj6cZLs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "325029015186-4b6e173bltricgrah1bca19s993594lu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
