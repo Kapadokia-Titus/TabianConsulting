@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Tabian Consulting</string>
+    <string name="app_name">Tubonge </string>
 
     <!-- Strings related to login -->
     <string name="prompt_email">Email</string>
@@ -70,6 +70,7 @@
     <string name="field_chatroom_messages">chatroom_messages</string>
     <string name="field_message">message</string>
     <string name="field_timestamp">timestamp</string>
+
 
 </resources>
 
