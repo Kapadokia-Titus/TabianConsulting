@@ -30,24 +30,67 @@
             android:id="@+id/textHeader"/>
 
 
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/textHeader"
+            android:layout_marginTop="30dp"
+            android:id="@+id/username_layout">
+
+            <EditText
+                android:id="@+id/input_username"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:inputType="textEmailAddress"
+                android:hint="@string/prompt_username"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/username_layout"
+            android:id="@+id/phone_layout">
+
+            <EditText
+                android:id="@+id/input_phone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/prompt_phone"
+                android:imeOptions="actionUnspecified" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/phone_layout"
+            android:id="@+id/email_layout">
+
             <EditText
                 android:id="@+id/input_email"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="30dp"
-                android:inputType="textEmailAddress"
                 android:hint="@string/prompt_email"
-                android:layout_below="@+id/textHeader"/>
+                android:imeOptions="actionUnspecified" />
 
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/email_layout"
+            android:id="@+id/password_layout">
 
             <EditText
                 android:id="@+id/input_password"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp"
                 android:inputType="textPassword"
-                android:hint="@string/current_password"
-                android:layout_below="@+id/input_email"/>
+                android:hint="@string/current_password"/>
+        </com.google.android.material.textfield.TextInputLayout>
+
 
 
 
@@ -57,7 +100,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="35dp"
-            android:layout_below="@+id/input_password"
+            android:layout_below="@+id/password_layout"
             android:text="Save"
             android:background="@drawable/blue_button"/>
 

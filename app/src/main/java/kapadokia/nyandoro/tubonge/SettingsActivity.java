@@ -23,6 +23,8 @@ import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.SignInMethodQueryResult;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 
 public class SettingsActivity extends AppCompatActivity {
@@ -35,21 +37,26 @@ public class SettingsActivity extends AppCompatActivity {
     private FirebaseAuth.AuthStateListener mAuthListener;
 
     //widgets
-    private EditText mEmail, mCurrentPassword;
+    private EditText mName, mPhone, mEmail, mCurrentPassword;
     private Button mSave;
     private ProgressBar mProgressBar;
     private TextView mResetPasswordLink;
+
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
         Log.d(TAG, "onCreate: started.");
+
+        mName = findViewById(R.id.input_username);
+        mPhone = findViewById(R.id.input_phone);
         mEmail = (EditText) findViewById(R.id.input_email);
         mCurrentPassword = (EditText) findViewById(R.id.input_password);
         mSave= (Button) findViewById(R.id.btn_save);
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
         mResetPasswordLink = (TextView) findViewById(R.id.change_password);
+
 
         setupFirebaseAuth();
 
@@ -76,8 +83,37 @@ public class SettingsActivity extends AppCompatActivity {
                     }else{
                         Toast.makeText(SettingsActivity.this, "Email and Current Password Fields Must be Filled to Save", Toast.LENGTH_SHORT).show();
                     }
+
                 }
+
+                DatabaseReference reference = FirebaseDatabase.getInstance().getReference();
+                 /*
+                    ------------ Change name -------
+                     */
+
+                if (!mName.getText().toString().equals("")){
+                    reference.child(getString(R.string.dbnode_users))
+                            .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                            .child(getString(R.string.field_name))
+                            .setValue(mName.getText().toString());
+                }
+
+                     /*
+                    ------------ Change phone -------
+                     */
+
+                if (!mPhone.getText().toString().equals("")){
+                    reference.child(getString(R.string.dbnode_users))
+                            .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                            .child(getString(R.string.field_phone))
+                            .setValue(mPhone.getText().toString());
+                }
+
             }
+
+
+
+
         });
 
         mResetPasswordLink.setOnClickListener(new View.OnClickListener() {
