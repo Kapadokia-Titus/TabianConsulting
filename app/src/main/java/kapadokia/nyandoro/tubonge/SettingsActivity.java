@@ -1,12 +1,19 @@
 package kapadokia.nyandoro.tubonge;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -14,6 +21,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
@@ -30,23 +39,60 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
 import kapadokia.nyandoro.tubonge.models.User;
 
 
-public class SettingsActivity extends AppCompatActivity {
+public class SettingsActivity extends AppCompatActivity implements
+        ChangePhotoDialog.OnPhotoReceivedListener{
 
     private static final String TAG = "SettingsActivity";
 
+    @Override
+    public void getImagePath(Uri imagePath) {
+        if( !imagePath.toString().equals("")){
+            mSelectedImageBitmap = null;
+            mSelectedImageUri = imagePath;
+            Log.d(TAG, "getImagePath: got the image uri: " + mSelectedImageUri);
+
+        }
+
+    }
+
+    @Override
+    public void getImageBitmap(Bitmap bitmap) {
+        if(bitmap != null){
+            mSelectedImageUri = null;
+            mSelectedImageBitmap = bitmap;
+            Log.d(TAG, "getImageBitmap: got the image bitmap: " + mSelectedImageBitmap);
+        }
+    }
+
+
     private static final String DOMAIN_NAME = "tabian.ca";
+    private static final int REQUEST_CODE = 1234;
+    private static final double MB_THRESHHOLD = 5.0;
+    private static final double MB = 1000000.0;
+
 
     //firebase
     private FirebaseAuth.AuthStateListener mAuthListener;
 
     //widgets
-    private EditText mName, mPhone, mEmail, mCurrentPassword;
+    private EditText mEmail, mCurrentPassword, mName, mPhone;
+    private ImageView mProfileImage;
     private Button mSave;
     private ProgressBar mProgressBar;
     private TextView mResetPasswordLink;
+
+    //vars
+    private boolean mStoragePermissions;
+    private Uri mSelectedImageUri;
+    private Bitmap mSelectedImageBitmap;
+    private byte[] mBytes;
+    private double progress;
 
 
     @Override
@@ -54,78 +100,28 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
         Log.d(TAG, "onCreate: started.");
-
-        mName = findViewById(R.id.input_username);
-        mPhone = findViewById(R.id.input_phone);
         mEmail = (EditText) findViewById(R.id.input_email);
         mCurrentPassword = (EditText) findViewById(R.id.input_password);
         mSave= (Button) findViewById(R.id.btn_save);
         mProgressBar = (ProgressBar) findViewById(R.id.progressBar);
         mResetPasswordLink = (TextView) findViewById(R.id.change_password);
+        mName = (EditText) findViewById(R.id.input_username);
+        mPhone = (EditText) findViewById(R.id.input_phone);
+        mProfileImage = (ImageView) findViewById(R.id.profile_image);
 
-
+        verifyStoragePermissions();
         setupFirebaseAuth();
         setCurrentEmail();
         init();
         hideSoftKeyboard();
+
     }
 
-   private void getUserAccountData(){
-       Log.d(TAG, "getUserAccountData: getting the users account info");
-
-       DatabaseReference reference = FirebaseDatabase.getInstance().getReference();
-
-//    // ----------- Query  method one  ---- //
-//       Query query1 = reference.child(getString(R.string.dbnode_users))
-//               .orderByKey()
-//               .equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid());
-//
-//       query1.addListenerForSingleValueEvent(new ValueEventListener() {
-//           @Override
-//           public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-//               for (DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
-//                   User user  = singleSnapshot.getValue(User.class);
-//
-//                   Log.d(TAG, "onDataChange: (QUERY METHOD 1) found user "+user.toString());
-//                   mName.setText(user.getName());
-//                   mPhone.setText(user.getPhone());
-//               }
-//           }
-//
-//           @Override
-//           public void onCancelled(@NonNull DatabaseError databaseError) {
-//
-//           }
-//       });
-
-       // ----------- Query  method two  ---- //
-       Query query2 = reference.child(getString(R.string.dbnode_users))
-               .orderByChild(getString(R.string.field_user_id))
-               .equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid());
-
-       query2.addListenerForSingleValueEvent(new ValueEventListener() {
-           @Override
-           public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-               for (DataSnapshot singleSnapshot : dataSnapshot.getChildren()){
-                   User user  = singleSnapshot.getValue(User.class);
-
-                   Log.d(TAG, "onDataChange: (QUERY METHOD 2) found user "+user.toString());
-                   mName.setText(user.getName());
-                   mPhone.setText(user.getPhone());
-               }
-           }
-
-           @Override
-           public void onCancelled(@NonNull DatabaseError databaseError) {
-
-           }
-       });
-
-       mEmail.setText(FirebaseAuth.getInstance().getCurrentUser().getEmail());
-   }
 
     private void init(){
+
         getUserAccountData();
+
         mSave.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -147,37 +143,45 @@ public class SettingsActivity extends AppCompatActivity {
                     }else{
                         Toast.makeText(SettingsActivity.this, "Email and Current Password Fields Must be Filled to Save", Toast.LENGTH_SHORT).show();
                     }
-
                 }
 
-                DatabaseReference reference = FirebaseDatabase.getInstance().getReference();
-                 /*
-                    ------------ Change name -------
-                     */
 
-                if (!mName.getText().toString().equals("")){
+                /*
+                ------ METHOD 1 for changing database data (proper way in this scenario) -----
+                 */
+                DatabaseReference reference = FirebaseDatabase.getInstance().getReference();
+                /*
+                ------ Change Name -----
+                 */
+                if(!mName.getText().toString().equals("")){
                     reference.child(getString(R.string.dbnode_users))
                             .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
                             .child(getString(R.string.field_name))
                             .setValue(mName.getText().toString());
                 }
 
-                     /*
-                    ------------ Change phone -------
-                     */
 
-                if (!mPhone.getText().toString().equals("")){
+                /*
+                ------ Change Phone Number -----
+                 */
+                if(!mPhone.getText().toString().equals("")){
                     reference.child(getString(R.string.dbnode_users))
                             .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
                             .child(getString(R.string.field_phone))
                             .setValue(mPhone.getText().toString());
                 }
 
+                Toast.makeText(SettingsActivity.this, "saved", Toast.LENGTH_SHORT).show();
+
+                 /*
+                ------ Upload the New Photo -----
+                 */
+                if(mSelectedImageUri != null){
+                    uploadNewPhoto(mSelectedImageUri);
+                }else if(mSelectedImageBitmap  != null){
+                    uploadNewPhoto(mSelectedImageBitmap);
+                }
             }
-
-
-
-
         });
 
         mResetPasswordLink.setOnClickListener(new View.OnClickListener() {
@@ -191,7 +195,226 @@ public class SettingsActivity extends AppCompatActivity {
                 sendResetPasswordLink();
             }
         });
+
+
+        mProfileImage.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(mStoragePermissions){
+                    ChangePhotoDialog dialog = new ChangePhotoDialog();
+                    dialog.show(getSupportFragmentManager(), getString(R.string.dialog_change_photo));
+                }else{
+                    verifyStoragePermissions();
+                }
+
+            }
+        });
+
     }
+
+    /**
+     * Uploads a new profile photo to Firebase Storage using a @param ***imageUri***
+     * @param imageUri
+     */
+    public void uploadNewPhoto(Uri imageUri){
+        /*
+            upload a new profile photo to firebase storage
+         */
+        Log.d(TAG, "uploadNewPhoto: uploading new profile photo to firebase storage.");
+
+        //Only accept image sizes that are compressed to under 5MB. If thats not possible
+        //then do not allow image to be uploaded
+        BackgroundImageResize resize = new BackgroundImageResize(null);
+        resize.execute(imageUri);
+    }
+
+    /**
+     * Uploads a new profile photo to Firebase Storage using a @param ***imageBitmap***
+     * @param imageBitmap
+     */
+    public void uploadNewPhoto(Bitmap imageBitmap){
+        /*
+            upload a new profile photo to firebase storage
+         */
+        Log.d(TAG, "uploadNewPhoto: uploading new profile photo to firebase storage.");
+
+        //Only accept image sizes that are compressed to under 5MB. If thats not possible
+        //then do not allow image to be uploaded
+        BackgroundImageResize resize = new BackgroundImageResize(imageBitmap);
+        Uri uri = null;
+        resize.execute(uri);
+    }
+
+    /**
+     * 1) doinBackground takes an imageUri and returns the byte array after compression
+     * 2) onPostExecute will print the % compression to the log once finished
+     */
+    public class BackgroundImageResize extends AsyncTask<Uri, Integer, byte[]> {
+
+        Bitmap mBitmap;
+        public BackgroundImageResize(Bitmap bm) {
+            if(bm != null){
+                mBitmap = bm;
+            }
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            showDialog();
+            Toast.makeText(SettingsActivity.this, "compressing image", Toast.LENGTH_SHORT).show();
+        }
+
+        @Override
+        protected byte[] doInBackground(Uri... params ) {
+            Log.d(TAG, "doInBackground: started.");
+
+            if(mBitmap == null){
+
+                try {
+                    mBitmap = MediaStore.Images.Media.getBitmap(SettingsActivity.this.getContentResolver(), params[0]);
+                    Log.d(TAG, "doInBackground: bitmap size: megabytes: " + mBitmap.getByteCount()/MB + " MB");
+                } catch (IOException e) {
+                    Log.e(TAG, "doInBackground: IOException: ", e.getCause());
+                }
+            }
+
+            byte[] bytes = null;
+            for (int i = 1; i < 11; i++){
+                if(i == 10){
+                    Toast.makeText(SettingsActivity.this, "That image is too large.", Toast.LENGTH_SHORT).show();
+                    break;
+                }
+                bytes = getBytesFromBitmap(mBitmap,100/i);
+                Log.d(TAG, "doInBackground: megabytes: (" + (11-i) + "0%) "  + bytes.length/MB + " MB");
+                if(bytes.length/MB  < MB_THRESHHOLD){
+                    return bytes;
+                }
+            }
+            return bytes;
+        }
+
+
+        @Override
+        protected void onPostExecute(byte[] bytes) {
+            super.onPostExecute(bytes);
+            hideDialog();
+            mBytes = bytes;
+            //execute the upload
+            executeUploadTask();
+        }
+    }
+
+    // convert from bitmap to byte array
+    public static byte[] getBytesFromBitmap(Bitmap bitmap, int quality) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream);
+        return stream.toByteArray();
+    }
+
+    private void executeUploadTask(){
+
+    }
+
+    private void getUserAccountData(){
+        Log.d(TAG, "getUserAccountData: getting the user's account information");
+
+        DatabaseReference reference = FirebaseDatabase.getInstance().getReference();
+
+        /*
+            ---------- QUERY Method 1 ----------
+         */
+        Query query1 = reference.child(getString(R.string.dbnode_users))
+                .orderByKey()
+                .equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        query1.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+
+                //this loop will return a single result
+                for(DataSnapshot singleSnapshot: dataSnapshot.getChildren()){
+                    Log.d(TAG, "onDataChange: (QUERY METHOD 1) found user: "
+                            + singleSnapshot.getValue(User.class).toString());
+                    User user = singleSnapshot.getValue(User.class);
+                    mName.setText(user.getName());
+                    mPhone.setText(user.getPhone());
+
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+
+        /*
+            ---------- QUERY Method 2 ----------
+         */
+        Query query2 = reference.child(getString(R.string.dbnode_users))
+                .orderByChild(getString(R.string.field_user_id))
+                .equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid());
+        query2.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+
+                //this loop will return a single result
+                for(DataSnapshot singleSnapshot: dataSnapshot.getChildren()){
+                    Log.d(TAG, "onDataChange: (QUERY METHOD 2) found user: "
+                            + singleSnapshot.getValue(User.class).toString());
+                }
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+
+            }
+        });
+
+        mEmail.setText(FirebaseAuth.getInstance().getCurrentUser().getEmail());
+    }
+
+
+
+    /**
+     * Generalized method for asking permission. Can pass any array of permissions
+     */
+    public void verifyStoragePermissions(){
+        Log.d(TAG, "verifyPermissions: asking user for permissions.");
+        String[] permissions = {android.Manifest.permission.READ_EXTERNAL_STORAGE,
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                Manifest.permission.CAMERA};
+        if (ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                permissions[0] ) == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                permissions[1] ) == PackageManager.PERMISSION_GRANTED
+                && ContextCompat.checkSelfPermission(this.getApplicationContext(),
+                permissions[2] ) == PackageManager.PERMISSION_GRANTED) {
+            mStoragePermissions = true;
+        } else {
+            ActivityCompat.requestPermissions(
+                    SettingsActivity.this,
+                    permissions,
+                    REQUEST_CODE
+            );
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+
+        Log.d(TAG, "onRequestPermissionsResult: requestCode: " + requestCode);
+        switch(requestCode){
+            case REQUEST_CODE:
+                if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
+                    Log.d(TAG, "onRequestPermissionsResult: User has allowed permission to access: " + permissions[0]);
+
+                }
+                break;
+        }
+    }
+
 
     private void sendResetPasswordLink(){
         FirebaseAuth.getInstance().sendPasswordResetEmail(FirebaseAuth.getInstance().getCurrentUser().getEmail())
@@ -312,9 +535,6 @@ public class SettingsActivity extends AppCompatActivity {
                     }
                 });
     }
-
-
-
 
 
 
@@ -443,6 +663,8 @@ public class SettingsActivity extends AppCompatActivity {
                 // ...
             }
         };
+
+
     }
 
     @Override
@@ -458,4 +680,6 @@ public class SettingsActivity extends AppCompatActivity {
             FirebaseAuth.getInstance().removeAuthStateListener(mAuthListener);
         }
     }
+
+
 }
