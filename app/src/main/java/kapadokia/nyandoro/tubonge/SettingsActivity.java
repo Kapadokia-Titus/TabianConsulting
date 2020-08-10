@@ -26,6 +26,7 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.EmailAuthProvider;
@@ -38,11 +39,18 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.OnProgressListener;
+import com.google.firebase.storage.StorageMetadata;
+import com.google.firebase.storage.StorageReference;
+import com.google.firebase.storage.UploadTask;
+import com.nostra13.universalimageloader.core.ImageLoader;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import kapadokia.nyandoro.tubonge.models.User;
+import kapadokia.nyandoro.tubonge.utility.FilePaths;
 
 
 public class SettingsActivity extends AppCompatActivity implements
@@ -56,7 +64,7 @@ public class SettingsActivity extends AppCompatActivity implements
             mSelectedImageBitmap = null;
             mSelectedImageUri = imagePath;
             Log.d(TAG, "getImagePath: got the image uri: " + mSelectedImageUri);
-
+            ImageLoader.getInstance().displayImage(imagePath.toString(), mProfileImage);
         }
 
     }
@@ -67,6 +75,7 @@ public class SettingsActivity extends AppCompatActivity implements
             mSelectedImageUri = null;
             mSelectedImageBitmap = bitmap;
             Log.d(TAG, "getImageBitmap: got the image bitmap: " + mSelectedImageBitmap);
+            mProfileImage.setImageBitmap(bitmap);
         }
     }
 
@@ -313,6 +322,72 @@ public class SettingsActivity extends AppCompatActivity implements
     }
 
     private void executeUploadTask(){
+        showDialog();
+        FilePaths filePaths = new FilePaths();
+//specify where the photo will be stored
+        final StorageReference storageReference = FirebaseStorage.getInstance().getReference()
+                .child(filePaths.FIREBASE_IMAGE_STORAGE + "/" + FirebaseAuth.getInstance().getCurrentUser().getUid()
+                        + "/profile_image"); //just replace the old image with the new one
+
+        if(mBytes.length/MB < MB_THRESHHOLD) {
+
+            // Create file metadata including the content type
+            StorageMetadata metadata = new StorageMetadata.Builder()
+                    .setContentType("image/jpg")
+                    .setContentLanguage("en") //see nodes below
+                    /*
+                    Make sure to use proper language code ("English" will cause a crash)
+                    I actually submitted this as a bug to the Firebase github page so it might be
+                    fixed by the time you watch this video. You can check it out at https://github.com/firebase/quickstart-unity/issues/116
+                     */
+                    .setCustomMetadata("Mitch's special meta data", "JK nothing special here")
+                    .setCustomMetadata("location", "Iceland")
+                    .build();
+            //if the image size is valid then we can submit to database
+            UploadTask uploadTask = null;
+            uploadTask = storageReference.putBytes(mBytes, metadata);
+            //uploadTask = storageReference.putBytes(mBytes); //without metadata
+
+
+            uploadTask.addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                    //Now insert the download url into the firebase database
+                    Uri firebaseURL = taskSnapshot.getMetadata().getReference().getDownloadUrl().getResult();
+                    Toast.makeText(SettingsActivity.this, "Upload Success", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "onSuccess: firebase download url : " + firebaseURL.toString());
+                    FirebaseDatabase.getInstance().getReference()
+                            .child(getString(R.string.dbnode_users))
+                            .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                            .child(getString(R.string.field_profile_image))
+                            .setValue(firebaseURL.toString());
+
+                    hideDialog();
+                }
+            }).addOnFailureListener(new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception exception) {
+                    Toast.makeText(SettingsActivity.this, "could not upload photo", Toast.LENGTH_SHORT).show();
+
+                    hideDialog();
+
+                }
+            }).addOnProgressListener(new OnProgressListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onProgress(UploadTask.TaskSnapshot taskSnapshot) {
+                    double currentProgress = (100 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
+                    if(currentProgress > (progress + 15)){
+                        progress = (100 * taskSnapshot.getBytesTransferred()) / taskSnapshot.getTotalByteCount();
+                        Log.d(TAG, "onProgress: Upload is " + progress + "% done");
+                        Toast.makeText(SettingsActivity.this, progress + "%", Toast.LENGTH_SHORT).show();
+                    }
+
+                }
+            })
+            ;
+        }else{
+            Toast.makeText(this, "Image is too Large", Toast.LENGTH_SHORT).show();
+        }
 
     }
 
@@ -338,7 +413,7 @@ public class SettingsActivity extends AppCompatActivity implements
                     User user = singleSnapshot.getValue(User.class);
                     mName.setText(user.getName());
                     mPhone.setText(user.getPhone());
-
+                    ImageLoader.getInstance().displayImage(user.getProfile_image(), mProfileImage);
                 }
             }
 
@@ -352,25 +427,25 @@ public class SettingsActivity extends AppCompatActivity implements
         /*
             ---------- QUERY Method 2 ----------
          */
-        Query query2 = reference.child(getString(R.string.dbnode_users))
-                .orderByChild(getString(R.string.field_user_id))
-                .equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid());
-        query2.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot dataSnapshot) {
-
-                //this loop will return a single result
-                for(DataSnapshot singleSnapshot: dataSnapshot.getChildren()){
-                    Log.d(TAG, "onDataChange: (QUERY METHOD 2) found user: "
-                            + singleSnapshot.getValue(User.class).toString());
-                }
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-
-            }
-        });
+//        Query query2 = reference.child(getString(R.string.dbnode_users))
+//                .orderByChild(getString(R.string.field_user_id))
+//                .equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid());
+//        query2.addListenerForSingleValueEvent(new ValueEventListener() {
+//            @Override
+//            public void onDataChange(DataSnapshot dataSnapshot) {
+//
+//                //this loop will return a single result
+//                for(DataSnapshot singleSnapshot: dataSnapshot.getChildren()){
+//                    Log.d(TAG, "onDataChange: (QUERY METHOD 2) found user: "
+//                            + singleSnapshot.getValue(User.class).toString());
+//                }
+//            }
+//
+//            @Override
+//            public void onCancelled(DatabaseError databaseError) {
+//
+//            }
+//        });
 
         mEmail.setText(FirebaseAuth.getInstance().getCurrentUser().getEmail());
     }

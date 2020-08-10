@@ -12,6 +12,9 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.nostra13.universalimageloader.core.ImageLoader;
+
+import kapadokia.nyandoro.tubonge.utility.UniversalImageLoader;
 
 public class SignedInActivity extends AppCompatActivity {
 
@@ -32,9 +35,17 @@ public class SignedInActivity extends AppCompatActivity {
 
         setupFirebaseAuth();
 
+        initImageLoader();
     }
 
-    
+    /**
+     * init universal image loader
+     */
+    private void initImageLoader(){
+        UniversalImageLoader imageLoader = new UniversalImageLoader(SignedInActivity.this);
+        ImageLoader.getInstance().init(imageLoader.getConfig());
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -133,3 +144,4 @@ public class SignedInActivity extends AppCompatActivity {
 
 
 }
+
