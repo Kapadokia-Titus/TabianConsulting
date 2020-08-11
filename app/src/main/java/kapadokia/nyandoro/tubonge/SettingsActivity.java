@@ -1,6 +1,7 @@
 package kapadokia.nyandoro.tubonge;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -24,6 +25,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -353,9 +355,9 @@ public class SettingsActivity extends AppCompatActivity implements
                 @Override
                 public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                     //Now insert the download url into the firebase database
-                    Uri firebaseURL = taskSnapshot.getMetadata().getReference().getDownloadUrl().getResult();
+                   Uri firebaseURL = taskSnapshot.getMetadata().getReference().getDownloadUrl().getResult();
                     Toast.makeText(SettingsActivity.this, "Upload Success", Toast.LENGTH_SHORT).show();
-                    Log.d(TAG, "onSuccess: firebase download url : " + firebaseURL.toString());
+                    Log.d("downloadUrl", "onSuccess: firebase download url : " + firebaseURL.toString());
                     FirebaseDatabase.getInstance().getReference()
                             .child(getString(R.string.dbnode_users))
                             .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
@@ -406,14 +408,22 @@ public class SettingsActivity extends AppCompatActivity implements
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
 
+                Context context = getApplicationContext();
                 //this loop will return a single result
                 for(DataSnapshot singleSnapshot: dataSnapshot.getChildren()){
-                    Log.d(TAG, "onDataChange: (QUERY METHOD 1) found user: "
+                    Log.d("query", "onDataChange: (QUERY METHOD 1) found user: "
                             + singleSnapshot.getValue(User.class).toString());
                     User user = singleSnapshot.getValue(User.class);
                     mName.setText(user.getName());
                     mPhone.setText(user.getPhone());
-                    ImageLoader.getInstance().displayImage(user.getProfile_image(), mProfileImage);
+                    // ImageLoader.getInstance().displayImage(, mProfileImage);
+
+                    Glide.with(context)
+                            .load(user.getProfile_image())
+                            .error(R.drawable.tabian_consulting_logo)
+                            .circleCrop()
+                            .into(mProfileImage);
+                    Log.d("query", "onDataChange: " + user.getProfile_image());
                 }
             }
 
