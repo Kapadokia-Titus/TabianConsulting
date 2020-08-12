@@ -355,7 +355,7 @@ public class SettingsActivity extends AppCompatActivity implements
                 @Override
                 public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
                     //Now insert the download url into the firebase database
-                   Uri firebaseURL = taskSnapshot.getMetadata().getReference().getDownloadUrl().getResult();
+                   Uri firebaseURL = taskSnapshot.getStorage().getDownloadUrl().getResult();
                     Toast.makeText(SettingsActivity.this, "Upload Success", Toast.LENGTH_SHORT).show();
                     Log.d("downloadUrl", "onSuccess: firebase download url : " + firebaseURL.toString());
                     FirebaseDatabase.getInstance().getReference()
